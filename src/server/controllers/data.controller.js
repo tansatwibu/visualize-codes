@@ -10,7 +10,7 @@ function createDataController({ config, fetchRecordsFromFile, aggregate, getCach
       }
       const records = await fetchRecordsFromFile();
       const result = aggregate(records, days, top);
-      res.json({ source: 'file', totalDays: result.totalDays, items: result.items });
+      res.json({ source: 'file', totalDays: result.totalDays, totalCodes: result.totalCodes, items: result.items });
     } catch (error) {
       console.error(error);
       res.status(500).json({ error: error.message });

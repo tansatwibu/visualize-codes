@@ -1,6 +1,6 @@
 window.dashboardPage = (() => {
   function init() {
-    const buttons = document.querySelectorAll('.range-buttons button');
+    const buttons = document.querySelectorAll('.range-toggle button');
     const loader = document.getElementById('loader');
     const monthPicker = document.getElementById('monthPicker');
     const yearPicker = document.getElementById('yearPicker');
@@ -9,6 +9,11 @@ window.dashboardPage = (() => {
     const codeBody = document.querySelector('#codes-table tbody');
     const dateBody = document.querySelector('#date-table tbody');
     const historyBody = document.querySelector('#history-table tbody');
+    const kpiTotalCodes = document.getElementById('kpiTotalCodes');
+    const kpiTotalDays = document.getElementById('kpiTotalDays');
+    const kpiTopCode = document.getElementById('kpiTopCode');
+    const kpiMaxCount = document.getElementById('kpiMaxCount');
+    const headerDate = document.getElementById('headerDate');
     let dailyRows = [];
     let initialMonthLoaded = false;
     let selectedDays = 30;
@@ -17,6 +22,25 @@ window.dashboardPage = (() => {
 
     function setLoading(value) {
       loader.style.display = value ? 'block' : 'none';
+    }
+
+    function updateHeaderDate() {
+      const now = new Date();
+      headerDate.textContent = now.toLocaleDateString('vi-VN', {
+        weekday: 'short',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+    }
+
+    function updateKPIs(items, totalDays, totalCodes) {
+      const topCode = totalCodes ? items[0].code : '—';
+      const maxCount = totalCodes ? items[0].count : '—';
+      kpiTotalCodes.textContent = totalCodes;
+      kpiTotalDays.textContent = totalDays;
+      kpiTopCode.textContent = topCode;
+      kpiMaxCount.textContent = maxCount;
     }
 
     function renderHistory(rows) {
@@ -32,6 +56,7 @@ window.dashboardPage = (() => {
         const data = cache.get(key) || await apiClient.fetchJson(`/api/data?days=${days}&top=8`);
         cache.set(key, data);
         tableRenderer.renderCodeRows(codeBody, data.items || []);
+        updateKPIs(data.items || [], data.totalDays || 0, data.totalCodes || 0);
       } catch (error) {
         tableRenderer.empty(codeBody, 4, 'Không thể tải dữ liệu');
         console.error(error);
@@ -47,7 +72,7 @@ window.dashboardPage = (() => {
         const data = cache.get(key) || await apiClient.fetchJson(`/api/daily-counts?month=${month}`);
         cache.set(key, data);
         const chartDays = buildMonthChartDays(month, data.days || []);
-        chartRenderer.draw('monthChart', chartDays.map(row => row.label), chartDays.map(row => row.count), '#999', monthPicker.value);
+        chartRenderer.draw('monthChart', chartDays.map(row => row.label), chartDays.map(row => row.count), '#3b82f6', monthPicker.value);
         if (!initialMonthLoaded) {
           dailyRows = data.days || [];
           renderHistory(dailyRows);
@@ -107,7 +132,7 @@ window.dashboardPage = (() => {
     function renderYearChart(year, monthlyRows) {
       const values = new Map(monthlyRows.map(item => [item.month, item.count]));
       const months = Array.from({ length: 12 }, (_, index) => `${year}-${String(index + 1).padStart(2, '0')}`);
-      chartRenderer.draw('yearChart', months.map(month => month.slice(5)), months.map(month => values.get(month) || 0), '#999');
+      chartRenderer.draw('yearChart', months.map(month => month.slice(5)), months.map(month => values.get(month) || 0), '#3b82f6');
     }
 
     async function searchCode() {
@@ -145,6 +170,7 @@ window.dashboardPage = (() => {
     monthPicker.value = currentMonth;
     yearPicker.value = now.getFullYear();
     datePicker.value = now.toISOString().slice(0, 10);
+    updateHeaderDate();
     loadCodes(selectedDays);
     loadMonth(currentMonth);
     loadDate(datePicker.value);

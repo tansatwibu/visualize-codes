@@ -59,9 +59,10 @@ function aggregate(records, days, top) {
       counts[code] = (counts[code] || 0) + 1;
     }
   }
+  const totalCodes = Object.keys(counts).length;
   const items = Object.keys(counts).map(code => ({ code, count: counts[code], percent: totalDays ? Math.round((counts[code] / totalDays) * 100) : 0 }));
   items.sort((a, b) => b.count - a.count);
-  return { totalDays, items: items.slice(0, top || items.length) };
+  return { totalDays, totalCodes, items: items.slice(0, top || items.length) };
 }
 
 async function aggregateFromMongo(days, top) {
@@ -109,10 +110,13 @@ async function aggregateFromMongo(days, top) {
     pipeline.push({ $group: { _id: { date: '$dateNormalized', code: '$codes' }, minProfitPerDayCode: { $min: '$profit_percent' }, maxProfitPerDayCode: { $max: '$profit_percent' } } });
     // then group by code to count distinct days and overall max profit
     pipeline.push({ $group: { _id: '$_id.code', count: { $sum: 1 }, minProfit: { $min: '$minProfitPerDayCode' }, maxProfit: { $max: '$maxProfitPerDayCode' } } });
+    const countPipeline = pipeline.slice();
     pipeline.push({ $sort: { count: -1 } });
     pipeline.push({ $limit: top || 100 });
 
     const itemsRaw = await coll.aggregate(pipeline).toArray();
+    const countRaw = await coll.aggregate([...countPipeline, { $count: 'totalCodes' }]).toArray();
+    const totalCodes = countRaw.length ? countRaw[0].totalCodes : 0;
     const items = itemsRaw.map(r => ({ code: r._id, count: r.count, minProfit: (typeof r.minProfit === 'number') ? r.minProfit : null, maxProfit: (typeof r.maxProfit === 'number') ? r.maxProfit : null }));
 
     // total distinct days
@@ -138,7 +142,7 @@ async function aggregateFromMongo(days, top) {
     const totalDays = dayRes.length ? dayRes[0].totalDays : 0;
 
     const enriched = items.map(i => ({ code: i.code, count: i.count, percent: totalDays ? Math.round((i.count / totalDays) * 100) : 0, minProfit: i.minProfit, maxProfit: i.maxProfit }));
-    return { totalDays, items: enriched };
+    return { totalDays, totalCodes, items: enriched };
 }
 
 // Simple in-memory cache to reduce repeated heavy DB aggregation
