@@ -1,0 +1,12 @@
+version: '3.8'
+services:
+  visualize:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - MONGO_URI=${MONGO_URI}
+      - MONGO_DBNAME=${MONGO_DBNAME}
+      - MONGO_COLLECTION=${MONGO_COLLECTION}
+      - CORS_ORIGIN=${CORS_ORIGIN}
+    restart: unless-stopped

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Thống kê mã theo ngày</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  </head>
+  <body>
+    <main class="dashboard">
+      <section class="dashboard-left">
+        <div class="month-picker"><label for="monthPicker">Tháng:</label><input id="monthPicker" type="month" /></div>
+        <section class="chart-card"><canvas id="monthChart"></canvas></section>
+        <div class="month-picker"><label for="yearPicker">Năm:</label><input id="yearPicker" type="number" min="2000" max="2100" /></div>
+        <section class="chart-card"><canvas id="yearChart"></canvas></section>
+      </section>
+
+      <section class="dashboard-right">
+        <div class="range-buttons"><button data-days="30" class="active">30 Days</button><button data-days="60">60 Days</button><button data-days="90">90 Days</button><button data-days="365">365 Days</button></div>
+        <section class="data-block"><table id="codes-table"><thead><tr><th>Mã</th><th>Số lần xuất hiện</th><th>% lợi nhuận thấp nhất</th><th>% lợi nhuận cao nhất</th></tr></thead><tbody></tbody></table></section>
+        <div class="date-search"><label for="datePicker">Ngày:</label><input id="datePicker" type="date" /></div>
+        <section class="data-block"><table id="date-table"><thead><tr><th>Mã</th><th>Số lần xuất hiện</th><th>% lợi nhuận thấp nhất</th><th>% lợi nhuận cao nhất</th></tr></thead><tbody></tbody></table></section>
+        <label class="code-search" for="codeSearch"><span>⌕</span><input id="codeSearch" type="search" placeholder="Search" /></label>
+        <section class="data-block"><table id="history-table"><thead><tr><th>Mã</th><th>Ngày</th><th>% lợi nhuận thấp nhất</th><th>% lợi nhuận cao nhất</th></tr></thead><tbody></tbody></table></section>
+      </section>
+      <div class="loader" id="loader" aria-hidden="true"></div>
+    </main>
+    <script src="/js/api.js"></script>
+    <script src="/js/charts.js"></script>
+    <script src="/js/tables.js"></script>
+    <script src="/js/dashboard.js"></script>
+    <script src="/app.js"></script>
+  </body>
+</html>

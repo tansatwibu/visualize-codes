@@ -1,0 +1,7 @@
+[
+  { "date": "2026-08-29", "codes": ["ACB", "HPG", "VIC"] },
+  { "date": "2026-08-30", "codes": ["HPG", "VIC", "ACB"] },
+  { "date": "2026-08-31", "codes": ["VIC", "ACB"] },
+  { "date": "2026-09-01", "codes": ["GDT", "ACB"] },
+  { "date": "2026-09-02", "codes": ["HPG", "VIC"] }
+]
