@@ -1,3 +1,5 @@
+const { buildDateRangeMatch } = require('../repositories/mongoQuery');
+
 function createDailyCountsController({ config, fetchRecordsFromFile, getMongoCollection, getCachedResponse, cacheResponse }) {
   async function getDailyCounts(req, res) {
     try {
@@ -46,7 +48,9 @@ function createDailyCountsController({ config, fetchRecordsFromFile, getMongoCol
         endDate = new Date(year, month, 0).toISOString().split('T')[0];
       }
 
-      const pipeline = [
+      const pipeline = [];
+      if (startDate || endDate) pipeline.push({ $match: buildDateRangeMatch(startDate, endDate) });
+      pipeline.push(
         { $addFields: { dateStr: { $ifNull: ['$datetime', '$date'] } } },
         {
           $addFields: {
@@ -68,7 +72,7 @@ function createDailyCountsController({ config, fetchRecordsFromFile, getMongoCol
         { $project: { dateNormalized: 1, codes: { $cond: [{ $isArray: '$codes' }, '$codes', { $cond: [{ $ifNull: ['$code', false] }, ['$code'], []] }] }, profit_percent: 1 } },
         { $unwind: '$codes' },
         { $match: { dateNormalized: { $ne: null } } }
-      ];
+      );
       if (startDate || endDate) {
         const match = {};
         if (startDate) match.$gte = startDate;

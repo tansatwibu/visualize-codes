@@ -1,7 +1,11 @@
 window.dashboardPage = (() => {
   function init() {
     const buttons = document.querySelectorAll('.range-toggle button');
-    const loader = document.getElementById('loader');
+    const monthChartArea = document.querySelector('#monthChart').parentElement;
+    const yearChartArea = document.querySelector('#yearChart').parentElement;
+    const codesArea = document.querySelector('#codes-table').parentElement;
+    const dateArea = document.querySelector('#date-table').parentElement;
+    const historyArea = document.querySelector('#history-table').parentElement;
     const monthPicker = document.getElementById('monthPicker');
     const yearPicker = document.getElementById('yearPicker');
     const datePicker = document.getElementById('datePicker');
@@ -20,8 +24,9 @@ window.dashboardPage = (() => {
     let searchTimer;
     const cache = new Map();
 
-    function setLoading(value) {
-      loader.style.display = value ? 'block' : 'none';
+    function setLoading(area, value) {
+      area.classList.toggle('is-loading', value);
+      area.setAttribute('aria-busy', String(value));
     }
 
     function updateHeaderDate() {
@@ -35,10 +40,16 @@ window.dashboardPage = (() => {
     }
 
     function updateKPIs(items, totalDays, totalCodes) {
-      const topCode = totalCodes ? items[0].code : '—';
-      const maxCount = totalCodes ? items[0].count : '—';
-      kpiTotalCodes.textContent = totalCodes;
-      kpiTotalDays.textContent = totalDays;
+      const rankedItems = items
+        .filter(item => item && item.code != null)
+        .slice()
+        .sort((left, right) => Number(right.count || 0) - Number(left.count || 0));
+      const topItem = rankedItems[0];
+      const hasData = Number(totalCodes) > 0 && topItem;
+      const topCode = hasData ? topItem.code : '—';
+      const maxCount = hasData ? topItem.count : '—';
+      kpiTotalCodes.textContent = Number(totalCodes) || 0;
+      kpiTotalDays.textContent = Number(totalDays) || 0;
       kpiTopCode.textContent = topCode;
       kpiMaxCount.textContent = maxCount;
     }
@@ -50,7 +61,7 @@ window.dashboardPage = (() => {
     }
 
     async function loadCodes(days) {
-      setLoading(true);
+      setLoading(codesArea, true);
       try {
         const key = `codes:${days}`;
         const data = cache.get(key) || await apiClient.fetchJson(`/api/data?days=${days}&top=8`);
@@ -61,12 +72,12 @@ window.dashboardPage = (() => {
         tableRenderer.empty(codeBody, 4, 'Không thể tải dữ liệu');
         console.error(error);
       } finally {
-        setLoading(false);
+        setLoading(codesArea, false);
       }
     }
 
     async function loadMonth(month) {
-      setLoading(true);
+      setLoading(monthChartArea, true);
       try {
         const key = `month:${month}`;
         const data = cache.get(key) || await apiClient.fetchJson(`/api/daily-counts?month=${month}`);
@@ -82,13 +93,13 @@ window.dashboardPage = (() => {
         tableRenderer.empty(historyBody, 4, 'Không thể tải dữ liệu ngày');
         console.error(error);
       } finally {
-        setLoading(false);
+        setLoading(monthChartArea, false);
       }
     }
 
     async function loadDate(date) {
       if (!date) return tableRenderer.renderDateRows(dateBody, null);
-      setLoading(true);
+      setLoading(dateArea, true);
       try {
         const key = `date:${date}`;
         const data = cache.get(key) || await apiClient.fetchJson(`/api/daily-counts?start=${date}&end=${date}`);
@@ -98,7 +109,7 @@ window.dashboardPage = (() => {
         tableRenderer.empty(dateBody, 4, 'Không thể tải dữ liệu ngày');
         console.error(error);
       } finally {
-        setLoading(false);
+        setLoading(dateArea, false);
       }
     }
 
@@ -114,6 +125,7 @@ window.dashboardPage = (() => {
     }
 
     async function loadYear(year) {
+      setLoading(yearChartArea, true);
       try {
         const data = await apiClient.fetchJson(`/api/monthly-counts?year=${year}`);
         renderYearChart(year, data.months || []);
@@ -126,6 +138,8 @@ window.dashboardPage = (() => {
         } catch (fallbackError) {
           console.error(fallbackError);
         }
+      } finally {
+        setLoading(yearChartArea, false);
       }
     }
 
@@ -139,14 +153,14 @@ window.dashboardPage = (() => {
       const code = codeSearch.value.trim();
       if (!code) return renderHistory(dailyRows);
       try {
-        setLoading(true);
+        setLoading(historyArea, true);
         const data = await apiClient.fetchJson(`/api/code-history?code=${encodeURIComponent(code)}&days=${selectedDays}`);
         tableRenderer.renderHistoryRows(historyBody, data.days || [], data.code || code);
       } catch (error) {
         tableRenderer.empty(historyBody, 4, `Không thể tìm kiếm dữ liệu: ${error.message}`);
         console.error(error);
       } finally {
-        setLoading(false);
+        setLoading(historyArea, false);
       }
     }
 

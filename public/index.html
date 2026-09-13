@@ -43,7 +43,7 @@
               <input id="monthPicker" type="month" />
             </div>
           </div>
-          <div class="chart-card"><canvas id="monthChart"></canvas></div>
+          <div class="chart-card loading-container"><canvas id="monthChart"></canvas></div>
         </div>
 
         <div class="panel">
@@ -54,7 +54,7 @@
               <input id="yearPicker" type="number" min="2000" max="2100" />
             </div>
           </div>
-          <div class="chart-card"><canvas id="yearChart"></canvas></div>
+          <div class="chart-card loading-container"><canvas id="yearChart"></canvas></div>
         </div>
       </section>
 
@@ -69,7 +69,7 @@
               <button data-days="365">1Y</button>
             </div>
           </div>
-          <div class="data-block">
+          <div class="data-block loading-container">
             <table id="codes-table">
               <thead><tr><th>Mã</th><th class="num">Số lần</th><th class="num">% LN thấp</th><th class="num">% LN cao</th></tr></thead>
               <tbody></tbody>
@@ -85,7 +85,7 @@
               <input id="datePicker" type="date" />
             </div>
           </div>
-          <div class="data-block">
+          <div class="data-block loading-container">
             <table id="date-table">
               <thead><tr><th>Mã</th><th class="num">Số lần</th><th class="num">% LN thấp</th><th class="num">% LN cao</th></tr></thead>
               <tbody></tbody>
@@ -101,7 +101,7 @@
               <input id="codeSearch" type="search" placeholder="Tìm mã cổ phiếu..." />
             </div>
           </div>
-          <div class="data-block">
+          <div class="data-block loading-container">
             <table id="history-table">
               <thead><tr><th>Mã</th><th>Ngày</th><th class="num">% LN thấp</th><th class="num">% LN cao</th></tr></thead>
               <tbody></tbody>
@@ -110,7 +110,6 @@
         </div>
       </section>
 
-      <div class="loader" id="loader" aria-hidden="true"></div>
     </main>
 
     <footer class="app-footer">

@@ -1,3 +1,5 @@
+const { buildDateRangeMatch } = require('../repositories/mongoQuery');
+
 function createMonthlyCountsController({ config, fetchRecordsFromFile, getMongoCollection, getCachedResponse, cacheResponse }) {
   async function getMonthlyCounts(req, res) {
     const year = String(req.query.year || new Date().getFullYear());
@@ -19,7 +21,10 @@ function createMonthlyCountsController({ config, fetchRecordsFromFile, getMongoC
       }
 
       const collection = await getMongoCollection();
+      const yearStart = `${year}-01-01`;
+      const yearEnd = `${year}-12-31`;
       const pipeline = [
+        { $match: buildDateRangeMatch(yearStart, yearEnd) },
         { $addFields: { dateNormalized: { $cond: [{ $ifNull: ['$datetime', false] }, { $dateToString: { format: '%Y-%m-%d', date: '$datetime' } }, { $substrCP: ['$date', 0, 10] }] } } },
         { $project: { dateNormalized: 1, codes: { $cond: [{ $isArray: '$codes' }, '$codes', { $cond: [{ $ifNull: ['$code', false] }, ['$code'], []] }] } } },
         { $match: { dateNormalized: { $regex: `^${year}-` } } },

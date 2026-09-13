@@ -1,3 +1,5 @@
+const { buildRollingDateRangeMatch, buildDateRangeMatch } = require('../repositories/mongoQuery');
+
 function createCodeHistoryController({ config, fetchRecordsFromFile, getMongoCollection, getCachedResponse, cacheResponse }) {
   async function getCodeHistory(req, res) {
     const code = String(req.query.code || '').trim().toUpperCase();
@@ -23,22 +25,22 @@ function createCodeHistoryController({ config, fetchRecordsFromFile, getMongoCol
       }
 
       const collection = await getMongoCollection();
-      const pipeline = [
-        { $addFields: { dateNormalized: { $cond: [{ $ifNull: ['$datetime', false] }, { $dateToString: { format: '%Y-%m-%d', date: '$datetime' } }, { $substrCP: [{ $convert: { input: '$date', to: 'string', onError: '', onNull: '' } }, 0, 10] }] } } },
-        { $project: { dateNormalized: 1, codes: { $cond: [{ $isArray: '$codes' }, '$codes', { $cond: [{ $ifNull: ['$code', false] }, ['$code'], []] }] }, profit_percent: 1 } },
-        { $unwind: '$codes' },
-        { $match: { codes: code } }
-      ];
+      const pipeline = [{ $match: { $or: [{ codes: code }, { code }] } }];
       if (requestedDays) {
-        const cutoff = new Date(Date.now() - requestedDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-        pipeline.push({ $match: { dateNormalized: { $gte: cutoff } } });
+        pipeline.push({ $match: buildRollingDateRangeMatch(requestedDays) });
       } else if (month && /^\d{4}-\d{2}$/.test(month)) {
         const [year, monthNumber] = month.split('-').map(Number);
         const nextMonth = monthNumber === 12
           ? `${year + 1}-01-01`
           : `${year}-${String(monthNumber + 1).padStart(2, '0')}-01`;
-        pipeline.push({ $match: { dateNormalized: { $gte: `${month}-01`, $lt: nextMonth } } });
+        pipeline.push({ $match: buildDateRangeMatch(`${month}-01`, nextMonth) });
       }
+      pipeline.push(
+        { $addFields: { dateNormalized: { $cond: [{ $ifNull: ['$datetime', false] }, { $dateToString: { format: '%Y-%m-%d', date: '$datetime' } }, { $substrCP: [{ $convert: { input: '$date', to: 'string', onError: '', onNull: '' } }, 0, 10] }] } } },
+        { $project: { dateNormalized: 1, codes: { $cond: [{ $isArray: '$codes' }, '$codes', { $cond: [{ $ifNull: ['$code', false] }, ['$code'], []] }] }, profit_percent: 1 } },
+        { $unwind: '$codes' },
+        { $match: { codes: code } }
+      );
       pipeline.push(
         { $group: { _id: '$dateNormalized', minProfit: { $min: '$profit_percent' }, maxProfit: { $max: '$profit_percent' } } },
         { $sort: { _id: 1 } }

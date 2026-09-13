@@ -8,6 +8,7 @@ const { createDataRouter } = require('./src/server/routes/data.routes');
 const { createCodeHistoryRouter } = require('./src/server/routes/codeHistory.routes');
 const { createMonthlyCountsRouter } = require('./src/server/routes/monthlyCounts.routes');
 const { createDailyCountsRouter } = require('./src/server/routes/dailyCounts.routes');
+const { buildRollingDateRangeMatch } = require('./src/server/repositories/mongoQuery');
 
 const app = express();
 const corsOptions = config.corsOrigin ? { origin: config.corsOrigin } : undefined;
@@ -71,6 +72,9 @@ async function aggregateFromMongo(days, top) {
   const coll = await getMongoCollection();
 
     const pipeline = [];
+    if (days) {
+      pipeline.push({ $match: buildRollingDateRangeMatch(days) });
+    }
     pipeline.push({ $addFields: { dateStr: { $ifNull: ['$datetime', '$date'] } } });
     pipeline.push({
       $addFields: {
@@ -99,47 +103,31 @@ async function aggregateFromMongo(days, top) {
     pipeline.push({ $unwind: '$codes' });
     pipeline.push({ $match: { dateNormalized: { $ne: null } } });
 
-    if (days) {
-      const now = new Date();
-      const cutoff = new Date(now.getTime() - (days * 24 * 60 * 60 * 1000));
-      const cutoffStr = cutoff.toISOString().split('T')[0];
-      pipeline.push({ $match: { dateNormalized: { $gte: cutoffStr } } });
-    }
-
-    // group by date+code to get max profit per day-code
-    pipeline.push({ $group: { _id: { date: '$dateNormalized', code: '$codes' }, minProfitPerDayCode: { $min: '$profit_percent' }, maxProfitPerDayCode: { $max: '$profit_percent' } } });
-    // then group by code to count distinct days and overall max profit
-    pipeline.push({ $group: { _id: '$_id.code', count: { $sum: 1 }, minProfit: { $min: '$minProfitPerDayCode' }, maxProfit: { $max: '$maxProfitPerDayCode' } } });
-    const countPipeline = pipeline.slice();
-    pipeline.push({ $sort: { count: -1 } });
-    pipeline.push({ $limit: top || 100 });
-
-    const itemsRaw = await coll.aggregate(pipeline).toArray();
-    const countRaw = await coll.aggregate([...countPipeline, { $count: 'totalCodes' }]).toArray();
-    const totalCodes = countRaw.length ? countRaw[0].totalCodes : 0;
-    const items = itemsRaw.map(r => ({ code: r._id, count: r.count, minProfit: (typeof r.minProfit === 'number') ? r.minProfit : null, maxProfit: (typeof r.maxProfit === 'number') ? r.maxProfit : null }));
-
-    // total distinct days
-    const dayPipeline = [];
-    dayPipeline.push({ $addFields: { dateStr: { $ifNull: ['$datetime', '$date'] } } });
-    dayPipeline.push({ $addFields: { dateNormalized: {
-      $cond: [
-        { $ifNull: ['$datetime', false] },
-        { $dateToString: { format: '%Y-%m-%d', date: '$datetime' } },
-        { $cond: [ { $regexMatch: { input: '$date', regex: '^\\d{2}-\\d{2}-\\d{4}$' } }, { $let: { vars: { parts: { $split: ['$date', '-'] } }, in: { $concat: [{ $arrayElemAt: ['$$parts',2] }, '-', { $arrayElemAt: ['$$parts',1] }, '-', { $arrayElemAt: ['$$parts',0] }] } } }, { $substrCP: ['$date',0,10] } ] }
-      ]
-    } } });
-    dayPipeline.push({ $match: { dateNormalized: { $ne: null } } });
-    if (days) {
-      const now = new Date();
-      const cutoff = new Date(now.getTime() - (days * 24 * 60 * 60 * 1000));
-      const cutoffStr = cutoff.toISOString().split('T')[0];
-      dayPipeline.push({ $match: { dateNormalized: { $gte: cutoffStr } } });
-    }
-    dayPipeline.push({ $group: { _id: '$dateNormalized' } });
-    dayPipeline.push({ $count: 'totalDays' });
-    const dayRes = await coll.aggregate(dayPipeline).toArray();
-    const totalDays = dayRes.length ? dayRes[0].totalDays : 0;
+    const [aggregation] = await coll.aggregate([
+      ...pipeline,
+      {
+        $facet: {
+          items: [
+            { $group: { _id: { date: '$dateNormalized', code: '$codes' }, minProfitPerDayCode: { $min: '$profit_percent' }, maxProfitPerDayCode: { $max: '$profit_percent' } } },
+            { $group: { _id: '$_id.code', count: { $sum: 1 }, minProfit: { $min: '$minProfitPerDayCode' }, maxProfit: { $max: '$maxProfitPerDayCode' } } },
+            { $sort: { count: -1 } },
+            { $limit: top || 100 }
+          ],
+          totalCodes: [
+            { $group: { _id: { date: '$dateNormalized', code: '$codes' } } },
+            { $group: { _id: '$_id.code' } },
+            { $count: 'value' }
+          ],
+          totalDays: [
+            { $group: { _id: '$dateNormalized' } },
+            { $count: 'value' }
+          ]
+        }
+      }
+    ]).toArray();
+    const totalCodes = aggregation.totalCodes[0]?.value || 0;
+    const totalDays = aggregation.totalDays[0]?.value || 0;
+    const items = aggregation.items.map(r => ({ code: r._id, count: r.count, minProfit: (typeof r.minProfit === 'number') ? r.minProfit : null, maxProfit: (typeof r.maxProfit === 'number') ? r.maxProfit : null }));
 
     const enriched = items.map(i => ({ code: i.code, count: i.count, percent: totalDays ? Math.round((i.count / totalDays) * 100) : 0, minProfit: i.minProfit, maxProfit: i.maxProfit }));
     return { totalDays, totalCodes, items: enriched };
@@ -190,4 +178,16 @@ app.use('/api', createDailyCountsRouter({
 
 app.use('/', express.static(path.join(__dirname, 'public')));
 
-app.listen(config.port, config.host, () => console.log(`Server running on http://${config.host}:${config.port} (accessible externally)`));
+async function startServer() {
+  if (config.mongoUri) {
+    console.log('Warming up MongoDB connection and indexes...');
+    await getMongoCollection();
+  }
+
+  app.listen(config.port, config.host, () => console.log(`Server running on http://${config.host}:${config.port} (accessible externally)`));
+}
+
+startServer().catch(error => {
+  console.error(`Server startup failed: ${error.message}`);
+  process.exitCode = 1;
+});

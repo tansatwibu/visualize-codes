@@ -64,7 +64,7 @@ Expected Mongo document shape (one document per day):
 
 MongoDB indexes (without changing document structure)
 
-The recommended first step is to create indexes manually in MongoDB. These commands only create indexes; they do not add, remove, or rewrite fields in existing documents.
+When MongoDB mode is enabled, the server creates these indexes automatically the first time it opens the collection. These commands are also provided for manual setup or verification; they only create indexes and do not add, remove, or rewrite fields in existing documents.
 
 ```javascript
 use mydb
@@ -91,7 +91,7 @@ db.records.explain("executionStats").find({ codes: "ACB", date: { $gte: "2026-08
 
 After creating the indexes, run the same commands again. Look for `IXSCAN` and a lower `totalDocsExamined`. Keep an index only when it improves the real workload; every index uses disk/RAM and makes writes slower.
 
-Important: creating an index is different from a data migration. Do not run `updateMany` or add fields such as `dateNormalized` just to create an index. The current aggregation pipelines calculate normalized dates at query time, so an index on `date` may not help those stages until the pipeline filters directly on the stored `date` field. Always confirm with `explain("executionStats")` before and after the change.
+Important: creating an index is different from a data migration. Do not run `updateMany` or add fields such as `dateNormalized` just to create an index. The aggregation pipelines now filter stored `date`, `datetime`, and `codes` fields before calculating normalized dates, allowing these indexes to reduce the scanned documents. Always confirm with `explain("executionStats")` before and after the change.
 
 To remove an index without changing documents:
 
