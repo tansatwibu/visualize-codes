@@ -26,13 +26,6 @@
       </div>
     </header>
 
-    <section class="kpi-bar" id="kpiBar">
-      <div class="kpi-card"><span class="kpi-label">Tổng mã</span><span class="kpi-value" id="kpiTotalCodes">—</span></div>
-      <div class="kpi-card"><span class="kpi-label">Tổng ngày</span><span class="kpi-value" id="kpiTotalDays">—</span></div>
-      <div class="kpi-card"><span class="kpi-label">Mã xuất hiện nhiều nhất</span><span class="kpi-value" id="kpiTopCode">—</span></div>
-      <div class="kpi-card"><span class="kpi-label">Tần suất cao nhất</span><span class="kpi-value" id="kpiMaxCount">—</span></div>
-    </section>
-
     <main class="dashboard">
       <section class="dashboard-left">
         <div class="panel">
@@ -87,7 +80,7 @@
           </div>
           <div class="data-block loading-container">
             <table id="date-table">
-              <thead><tr><th>Mã</th><th class="num">Số lần</th><th class="num">% LN thấp</th><th class="num">% LN cao</th></tr></thead>
+              <thead><tr><th><button class="sort-button" data-sort-key="code" type="button">Mã</button></th><th><button class="sort-button" data-sort-key="frequency" type="button">Tần suất xuất hiện</button></th><th class="num"><button class="sort-button" data-sort-key="minProfit" type="button">% LN thấp</button></th><th class="num"><button class="sort-button" data-sort-key="maxProfit" type="button">% LN cao</button></th></tr></thead>
               <tbody></tbody>
             </table>
           </div>
@@ -103,7 +96,7 @@
           </div>
           <div class="data-block loading-container">
             <table id="history-table">
-              <thead><tr><th>Mã</th><th>Ngày</th><th class="num">% LN thấp</th><th class="num">% LN cao</th></tr></thead>
+              <thead><tr><th><button class="sort-button" data-sort-key="code" type="button">Mã</button></th><th><button class="sort-button" data-sort-key="date" type="button">Ngày</button></th><th><button class="sort-button" data-sort-key="frequency" type="button">Tần suất xuất hiện</button></th><th class="num"><button class="sort-button" data-sort-key="minProfit" type="button">% LN thấp</button></th><th class="num"><button class="sort-button" data-sort-key="maxProfit" type="button">% LN cao</button></th></tr></thead>
               <tbody></tbody>
             </table>
           </div>

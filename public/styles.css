@@ -152,7 +152,7 @@ body {
 .dashboard {
   max-width: 1440px;
   margin: 0 auto;
-  padding: 0 24px 32px;
+  padding: 20px 24px 32px;
   display: grid;
   grid-template-columns: minmax(360px, 1fr) minmax(560px, 1.4fr);
   gap: 20px;
@@ -358,6 +358,26 @@ th.num, td.num {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
+.sort-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+}
+.sort-button::after {
+  content: '↕';
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.sort-button[data-sort-direction="asc"]::after { content: '↑'; color: var(--accent); }
+.sort-button[data-sort-direction="desc"]::after { content: '↓'; color: var(--accent); }
 tbody tr {
   background: var(--bg-surface);
   transition: background var(--transition);
@@ -391,6 +411,14 @@ td {
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
+.frequency-low,
+.frequency-medium,
+.frequency-high {
+  font-weight: 600;
+}
+.frequency-low { color: var(--gain); }
+.frequency-medium { color: var(--warning); }
+.frequency-high { color: var(--loss); }
 .empty-row {
   text-align: center;
   color: var(--text-muted);

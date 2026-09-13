@@ -13,13 +13,12 @@ window.dashboardPage = (() => {
     const codeBody = document.querySelector('#codes-table tbody');
     const dateBody = document.querySelector('#date-table tbody');
     const historyBody = document.querySelector('#history-table tbody');
-    const kpiTotalCodes = document.getElementById('kpiTotalCodes');
-    const kpiTotalDays = document.getElementById('kpiTotalDays');
-    const kpiTopCode = document.getElementById('kpiTopCode');
-    const kpiMaxCount = document.getElementById('kpiMaxCount');
     const headerDate = document.getElementById('headerDate');
     let dailyRows = [];
-    let initialMonthLoaded = false;
+    let selectedDateRows = [];
+    let historyRows = [];
+    let dateSort = { key: 'code', direction: 'asc' };
+    let historySort = { key: 'code', direction: 'asc' };
     let selectedDays = 30;
     let searchTimer;
     const cache = new Map();
@@ -39,35 +38,34 @@ window.dashboardPage = (() => {
       });
     }
 
-    function updateKPIs(items, totalDays, totalCodes) {
-      const rankedItems = items
-        .filter(item => item && item.code != null)
-        .slice()
-        .sort((left, right) => Number(right.count || 0) - Number(left.count || 0));
-      const topItem = rankedItems[0];
-      const hasData = Number(totalCodes) > 0 && topItem;
-      const topCode = hasData ? topItem.code : '—';
-      const maxCount = hasData ? topItem.count : '—';
-      kpiTotalCodes.textContent = Number(totalCodes) || 0;
-      kpiTotalDays.textContent = Number(totalDays) || 0;
-      kpiTopCode.textContent = topCode;
-      kpiMaxCount.textContent = maxCount;
-    }
-
     function renderHistory(rows) {
       const query = codeSearch.value.trim().toLowerCase();
       const result = rows.filter(row => !query || (row.codes || []).some(code => String(code).toLowerCase().includes(query)) || row.date.includes(query));
-      tableRenderer.renderHistoryRows(historyBody, result, codeSearch.value.trim());
+      historyRows = result;
+      renderHistoryTable();
+    }
+
+    function renderDateTable() {
+      tableRenderer.renderDateRows(dateBody, {
+        items: tableRenderer.sortRows(selectedDateRows, dateSort.key, dateSort.direction)
+      });
+    }
+
+    function renderHistoryTable() {
+      tableRenderer.renderHistoryRows(
+        historyBody,
+        tableRenderer.sortRows(historyRows, historySort.key, historySort.direction),
+        codeSearch.value.trim()
+      );
     }
 
     async function loadCodes(days) {
       setLoading(codesArea, true);
       try {
         const key = `codes:${days}`;
-        const data = cache.get(key) || await apiClient.fetchJson(`/api/data?days=${days}&top=8`);
+        const data = cache.get(key) || await apiClient.fetchJson(`/api/data?days=${days}&top=50`);
         cache.set(key, data);
-        tableRenderer.renderCodeRows(codeBody, data.items || []);
-        updateKPIs(data.items || [], data.totalDays || 0, data.totalCodes || 0);
+        tableRenderer.renderCodeRows(codeBody, (data.items || []).slice(0, 50));
       } catch (error) {
         tableRenderer.empty(codeBody, 4, 'Không thể tải dữ liệu');
         console.error(error);
@@ -84,11 +82,7 @@ window.dashboardPage = (() => {
         cache.set(key, data);
         const chartDays = buildMonthChartDays(month, data.days || []);
         chartRenderer.draw('monthChart', chartDays.map(row => row.label), chartDays.map(row => row.count), '#3b82f6', monthPicker.value);
-        if (!initialMonthLoaded) {
-          dailyRows = data.days || [];
-          renderHistory(dailyRows);
-          initialMonthLoaded = true;
-        }
+        dailyRows = data.days || [];
       } catch (error) {
         tableRenderer.empty(historyBody, 4, 'Không thể tải dữ liệu ngày');
         console.error(error);
@@ -104,7 +98,8 @@ window.dashboardPage = (() => {
         const key = `date:${date}`;
         const data = cache.get(key) || await apiClient.fetchJson(`/api/daily-counts?start=${date}&end=${date}`);
         cache.set(key, data);
-        tableRenderer.renderDateRows(dateBody, (data.days || [])[0]);
+        selectedDateRows = (data.days || [])[0]?.items || [];
+        renderDateTable();
       } catch (error) {
         tableRenderer.empty(dateBody, 4, 'Không thể tải dữ liệu ngày');
         console.error(error);
@@ -151,13 +146,14 @@ window.dashboardPage = (() => {
 
     async function searchCode() {
       const code = codeSearch.value.trim();
-      if (!code) return renderHistory(dailyRows);
+      if (!code) return tableRenderer.empty(historyBody, 5, 'Nhập mã để tìm kiếm lịch sử');
       try {
         setLoading(historyArea, true);
         const data = await apiClient.fetchJson(`/api/code-history?code=${encodeURIComponent(code)}&days=${selectedDays}`);
-        tableRenderer.renderHistoryRows(historyBody, data.days || [], data.code || code);
+        historyRows = (data.days || []).map(row => ({ ...row, code: data.code || code }));
+        renderHistoryTable();
       } catch (error) {
-        tableRenderer.empty(historyBody, 4, `Không thể tìm kiếm dữ liệu: ${error.message}`);
+        tableRenderer.empty(historyBody, 5, `Không thể tìm kiếm dữ liệu: ${error.message}`);
         console.error(error);
       } finally {
         setLoading(historyArea, false);
@@ -177,6 +173,14 @@ window.dashboardPage = (() => {
     codeSearch.addEventListener('input', () => {
       clearTimeout(searchTimer);
       searchTimer = setTimeout(searchCode, 350);
+    });
+    tableRenderer.bindSort(document.getElementById('date-table'), (key, direction) => {
+      dateSort = { key, direction };
+      renderDateTable();
+    });
+    tableRenderer.bindSort(document.getElementById('history-table'), (key, direction) => {
+      historySort = { key, direction };
+      renderHistoryTable();
     });
 
     const now = new Date();

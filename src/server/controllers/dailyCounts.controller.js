@@ -21,14 +21,18 @@ function createDailyCountsController({ config, fetchRecordsFromFile, getMongoCol
         });
         const byDate = new Map();
         filtered.forEach(record => {
-          if (!byDate.has(record.date)) byDate.set(record.date, new Set());
-          (record.codes || []).forEach(code => byDate.get(record.date).add(String(code)));
+          if (!byDate.has(record.date)) byDate.set(record.date, new Map());
+          const codes = byDate.get(record.date);
+          (record.codes || []).forEach(code => {
+            const normalizedCode = String(code);
+            codes.set(normalizedCode, (codes.get(normalizedCode) || 0) + 1);
+          });
         });
         const days = Array.from(byDate.entries()).map(([date, codes]) => ({
           date,
           count: codes.size,
-          codes: Array.from(codes),
-          items: Array.from(codes).map(code => ({ code, count: 1, minProfit: null, maxProfit: null }))
+          codes: Array.from(codes.keys()),
+          items: Array.from(codes, ([code, count]) => ({ code, count, minProfit: null, maxProfit: null }))
         }));
         days.sort((left, right) => left.date.localeCompare(right.date));
         res.json({
@@ -80,8 +84,8 @@ function createDailyCountsController({ config, fetchRecordsFromFile, getMongoCol
         pipeline.push({ $match: { dateNormalized: match } });
       }
       pipeline.push(
-        { $group: { _id: { date: '$dateNormalized', code: '$codes' }, minProfit: { $min: '$profit_percent' }, maxProfit: { $max: '$profit_percent' } } },
-        { $group: { _id: '$_id.date', items: { $push: { code: '$_id.code', count: 1, minProfit: '$minProfit', maxProfit: '$maxProfit' } }, codes: { $addToSet: '$_id.code' } } },
+        { $group: { _id: { date: '$dateNormalized', code: '$codes' }, count: { $sum: 1 }, minProfit: { $min: '$profit_percent' }, maxProfit: { $max: '$profit_percent' } } },
+        { $group: { _id: '$_id.date', items: { $push: { code: '$_id.code', count: '$count', minProfit: '$minProfit', maxProfit: '$maxProfit' } }, codes: { $addToSet: '$_id.code' } } },
         { $project: { date: '$_id', count: { $size: '$codes' }, codes: 1, items: 1 } },
         { $sort: { date: 1 } }
       );

@@ -15,12 +15,14 @@ function createCodeHistoryController({ config, fetchRecordsFromFile, getMongoCol
       if (!config.mongoUri) {
         const records = await fetchRecordsFromFile();
         const cutoff = requestedDays ? new Date(Date.now() - requestedDays * 24 * 60 * 60 * 1000) : null;
-        const matchingDays = records.filter(record => {
+        const countsByDate = new Map();
+        records.filter(record => {
           const matchesRange = cutoff
             ? new Date(`${record.date}T00:00:00Z`) >= cutoff
             : (!month || record.date.startsWith(month));
           return matchesRange && (record.codes || []).map(String).includes(code);
-        }).map(record => ({ date: record.date, minProfit: null, maxProfit: null }));
+        }).forEach(record => countsByDate.set(record.date, (countsByDate.get(record.date) || 0) + 1));
+        const matchingDays = Array.from(countsByDate, ([date, count]) => ({ date, count, minProfit: null, maxProfit: null }));
         return res.json(cacheResponse(cacheKey, { source: 'file', code, days: matchingDays }));
       }
 
@@ -42,11 +44,12 @@ function createCodeHistoryController({ config, fetchRecordsFromFile, getMongoCol
         { $match: { codes: code } }
       );
       pipeline.push(
-        { $group: { _id: '$dateNormalized', minProfit: { $min: '$profit_percent' }, maxProfit: { $max: '$profit_percent' } } },
+        { $group: { _id: '$dateNormalized', count: { $sum: 1 }, minProfit: { $min: '$profit_percent' }, maxProfit: { $max: '$profit_percent' } } },
         { $sort: { _id: 1 } }
       );
       const days = (await collection.aggregate(pipeline).toArray()).map(item => ({
         date: item._id,
+        count: item.count,
         minProfit: typeof item.minProfit === 'number' ? item.minProfit : null,
         maxProfit: typeof item.maxProfit === 'number' ? item.maxProfit : null
       }));
