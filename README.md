@@ -78,6 +78,42 @@ db.records.createIndex(
 	{ codes: 1, date: 1 },
 	{ name: "idx_records_codes_date" }
 )
+
+db.records.createIndex(
+	{ datetime: 1 },
+	{ name: "idx_records_datetime" }
+)
+
+db.records.createIndex(
+	{ codes: 1, datetime: 1 },
+	{ name: "idx_records_codes_datetime" }
+)
+
+// Chỉ cần nếu collection còn document legacy dùng trường code đơn.
+db.records.createIndex(
+	{ code: 1, date: 1 },
+	{
+		name: "idx_records_code_date",
+		partialFilterExpression: { code: { $exists: true } }
+	}
+)
+
+db.records.createIndex(
+	{ code: 1, datetime: 1 },
+	{
+		name: "idx_records_code_datetime",
+		partialFilterExpression: { code: { $exists: true } }
+	}
+)
+
+// Cover daily/monthly/top aggregations for the current legacy schema.
+db.records.createIndex(
+	{ datetime: 1, code: 1, profit_percent: 1 },
+	{
+		name: "idx_records_datetime_code_profit",
+		partialFilterExpression: { code: { $exists: true }, datetime: { $exists: true } }
+	}
+)
 ```
 
 Replace `mydb` and `records` with `MONGO_DBNAME` and `MONGO_COLLECTION` when they differ from the defaults.
@@ -87,31 +123,40 @@ Before creating an index, inspect the actual query plan:
 ```javascript
 db.records.explain("executionStats").find({ date: { $gte: "2026-08-01", $lt: "2026-09-01" } })
 db.records.explain("executionStats").find({ codes: "ACB", date: { $gte: "2026-08-01", $lt: "2026-09-01" } })
+db.records.explain("executionStats").find({ code: "ACB", datetime: { $gte: ISODate("2026-08-01"), $lt: ISODate("2026-09-01") } })
 ```
 
 After creating the indexes, run the same commands again. Look for `IXSCAN` and a lower `totalDocsExamined`. Keep an index only when it improves the real workload; every index uses disk/RAM and makes writes slower.
 
-Important: creating an index is different from a data migration. Do not run `updateMany` or add fields such as `dateNormalized` just to create an index. The aggregation pipelines now filter stored `date`, `datetime`, and `codes` fields before calculating normalized dates, allowing these indexes to reduce the scanned documents. Always confirm with `explain("executionStats")` before and after the change.
+Important: creating an index is different from a data migration. Do not run `updateMany` or add fields such as `dateNormalized` just to create an index. The aggregation pipelines filter stored `date`, `datetime`, `codes`, and legacy `code` fields before calculating normalized dates, allowing these indexes to reduce the scanned documents. Always confirm with `explain("executionStats")` before and after the change.
 
 To remove an index without changing documents:
 
 ```javascript
 db.records.dropIndex("idx_records_date")
 db.records.dropIndex("idx_records_codes_date")
+db.records.dropIndex("idx_records_datetime")
+db.records.dropIndex("idx_records_codes_datetime")
+db.records.dropIndex("idx_records_code_date")
+db.records.dropIndex("idx_records_code_datetime")
+db.records.dropIndex("idx_records_datetime_code_profit")
+// Các index cũ này không còn dùng; collection hiện tại không có dateNormalized.
+db.records.dropIndex("idx_records_dateNormalized")
+db.records.dropIndex("idx_records_codes_dateNormalized")
 ```
 
 API
 
 - `GET /api/data?days=30&top=8` — returns top codes, their counts and percent of days in the requested period.
 - `GET /api/sample` — returns a small sample of records.
-- `GET /api/code-history?code=ACB&days=30` — returns the dates where a code appeared.
+- `GET /api/code-history?code=ACB` — returns up to the 50 most recent dates where a code appeared.
 - `GET /api/monthly-counts?year=2026` — returns code-day counts grouped by month.
 - `GET /api/daily-counts?month=2026-08` — returns daily code counts for a month.
 - `GET /api/daily-counts?start=2026-08-29&end=2026-09-01` — returns daily code counts for a date range.
 
 Notes
 
-- The frontend buttons map to the `days` query parameter.
+- The frontend buttons only control the Top codes period; code history always uses its own 50 most recent dates.
 - `percent` is `count / totalDays * 100` rounded to integer.
 
 Run on a remote server or different device

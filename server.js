@@ -8,7 +8,7 @@ const { createDataRouter } = require('./src/server/routes/data.routes');
 const { createCodeHistoryRouter } = require('./src/server/routes/codeHistory.routes');
 const { createMonthlyCountsRouter } = require('./src/server/routes/monthlyCounts.routes');
 const { createDailyCountsRouter } = require('./src/server/routes/dailyCounts.routes');
-const { buildRollingDateRangeMatch } = require('./src/server/repositories/mongoQuery');
+const { buildRollingDatetimeRangeMatch } = require('./src/server/repositories/mongoQuery');
 
 const app = express();
 const corsOptions = config.corsOrigin ? { origin: config.corsOrigin } : undefined;
@@ -72,25 +72,11 @@ async function aggregateFromMongo(days, top) {
   const coll = await getMongoCollection();
 
     const pipeline = [];
-    if (days) {
-      pipeline.push({ $match: buildRollingDateRangeMatch(days) });
-    }
-    pipeline.push({ $addFields: { dateStr: { $ifNull: ['$datetime', '$date'] } } });
+    if (days) pipeline.push({ $match: buildRollingDatetimeRangeMatch(days) });
     pipeline.push({
       $addFields: {
-        dateNormalized: {
-          $cond: [
-            { $ifNull: ['$datetime', false] },
-            { $dateToString: { format: '%Y-%m-%d', date: '$datetime' } },
-            {
-              $cond: [
-                { $regexMatch: { input: '$date', regex: '^\\d{2}-\\d{2}-\\d{4}$' } },
-                { $let: { vars: { parts: { $split: ['$date', '-'] } }, in: { $concat: [{ $arrayElemAt: ['$$parts', 2] }, '-', { $arrayElemAt: ['$$parts', 1] }, '-', { $arrayElemAt: ['$$parts', 0] }] } } },
-                { $substrCP: ['$date', 0, 10] }
-              ]
-            }
-          ]
-        }
+        dateNormalized: { $dateToString: { format: '%Y-%m-%d', date: '$datetime' } },
+        codes: { $cond: [{ $isArray: '$codes' }, '$codes', ['$code']] }
       }
     });
     pipeline.push({
@@ -101,25 +87,24 @@ async function aggregateFromMongo(days, top) {
       }
     });
     pipeline.push({ $unwind: '$codes' });
-    pipeline.push({ $match: { dateNormalized: { $ne: null } } });
+    pipeline.push({ $unwind: '$codes' });
+    pipeline.push({ $group: { _id: { date: '$dateNormalized', code: '$codes' }, minProfitPerDayCode: { $min: '$profit_percent' }, maxProfitPerDayCode: { $max: '$profit_percent' } } });
 
     const [aggregation] = await coll.aggregate([
       ...pipeline,
       {
         $facet: {
           items: [
-            { $group: { _id: { date: '$dateNormalized', code: '$codes' }, minProfitPerDayCode: { $min: '$profit_percent' }, maxProfitPerDayCode: { $max: '$profit_percent' } } },
             { $group: { _id: '$_id.code', count: { $sum: 1 }, minProfit: { $min: '$minProfitPerDayCode' }, maxProfit: { $max: '$maxProfitPerDayCode' } } },
             { $sort: { count: -1 } },
             { $limit: top || 100 }
           ],
           totalCodes: [
-            { $group: { _id: { date: '$dateNormalized', code: '$codes' } } },
             { $group: { _id: '$_id.code' } },
             { $count: 'value' }
           ],
           totalDays: [
-            { $group: { _id: '$dateNormalized' } },
+            { $group: { _id: '$_id.date' } },
             { $count: 'value' }
           ]
         }

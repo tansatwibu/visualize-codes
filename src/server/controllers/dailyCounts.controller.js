@@ -1,4 +1,4 @@
-const { buildDateRangeMatch } = require('../repositories/mongoQuery');
+const { buildDatetimeRangeMatch } = require('../repositories/mongoQuery');
 
 function createDailyCountsController({ config, fetchRecordsFromFile, getMongoCollection, getCachedResponse, cacheResponse }) {
   async function getDailyCounts(req, res) {
@@ -53,36 +53,17 @@ function createDailyCountsController({ config, fetchRecordsFromFile, getMongoCol
       }
 
       const pipeline = [];
-      if (startDate || endDate) pipeline.push({ $match: buildDateRangeMatch(startDate, endDate) });
+      if (startDate || endDate) pipeline.push({ $match: buildDatetimeRangeMatch(startDate, endDate) });
       pipeline.push(
-        { $addFields: { dateStr: { $ifNull: ['$datetime', '$date'] } } },
         {
           $addFields: {
-            dateNormalized: {
-              $cond: [
-                { $ifNull: ['$datetime', false] },
-                { $dateToString: { format: '%Y-%m-%d', date: '$datetime' } },
-                {
-                  $cond: [
-                    { $regexMatch: { input: '$date', regex: '^\\d{2}-\\d{2}-\\d{4}$' } },
-                    { $let: { vars: { parts: { $split: ['$date', '-'] } }, in: { $concat: [{ $arrayElemAt: ['$$parts', 2] }, '-', { $arrayElemAt: ['$$parts', 1] }, '-', { $arrayElemAt: ['$$parts', 0] }] } } },
-                    { $substrCP: ['$date', 0, 10] }
-                  ]
-                }
-              ]
-            }
+            dateNormalized: { $dateToString: { format: '%Y-%m-%d', date: '$datetime' } },
+            codes: { $cond: [{ $isArray: '$codes' }, '$codes', ['$code']] }
           }
         },
-        { $project: { dateNormalized: 1, codes: { $cond: [{ $isArray: '$codes' }, '$codes', { $cond: [{ $ifNull: ['$code', false] }, ['$code'], []] }] }, profit_percent: 1 } },
-        { $unwind: '$codes' },
-        { $match: { dateNormalized: { $ne: null } } }
+        { $project: { dateNormalized: 1, codes: 1, profit_percent: 1 } },
+        { $unwind: '$codes' }
       );
-      if (startDate || endDate) {
-        const match = {};
-        if (startDate) match.$gte = startDate;
-        if (endDate) match.$lte = endDate;
-        pipeline.push({ $match: { dateNormalized: match } });
-      }
       pipeline.push(
         { $group: { _id: { date: '$dateNormalized', code: '$codes' }, count: { $sum: 1 }, minProfit: { $min: '$profit_percent' }, maxProfit: { $max: '$profit_percent' } } },
         { $group: { _id: '$_id.date', items: { $push: { code: '$_id.code', count: '$count', minProfit: '$minProfit', maxProfit: '$maxProfit' } }, codes: { $addToSet: '$_id.code' } } },

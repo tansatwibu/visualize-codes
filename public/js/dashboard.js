@@ -19,7 +19,6 @@ window.dashboardPage = (() => {
     let historyRows = [];
     let dateSort = { key: 'code', direction: 'asc' };
     let historySort = { key: 'code', direction: 'asc' };
-    let selectedDays = 30;
     let searchTimer;
     const cache = new Map();
 
@@ -149,7 +148,7 @@ window.dashboardPage = (() => {
       if (!code) return tableRenderer.empty(historyBody, 5, 'Nhập mã để tìm kiếm lịch sử');
       try {
         setLoading(historyArea, true);
-        const data = await apiClient.fetchJson(`/api/code-history?code=${encodeURIComponent(code)}&days=${selectedDays}`);
+        const data = await apiClient.fetchJson(`/api/code-history?code=${encodeURIComponent(code)}`);
         historyRows = (data.days || []).map(row => ({ ...row, code: data.code || code }));
         renderHistoryTable();
       } catch (error) {
@@ -163,9 +162,7 @@ window.dashboardPage = (() => {
     buttons.forEach(button => button.addEventListener('click', () => {
       buttons.forEach(item => item.classList.remove('active'));
       button.classList.add('active');
-      selectedDays = Number(button.dataset.days);
-      loadCodes(selectedDays);
-      if (codeSearch.value.trim()) searchCode();
+      loadCodes(Number(button.dataset.days));
     }));
     monthPicker.addEventListener('change', () => loadMonth(monthPicker.value));
     yearPicker.addEventListener('change', () => loadYear(yearPicker.value));
@@ -189,7 +186,7 @@ window.dashboardPage = (() => {
     yearPicker.value = now.getFullYear();
     datePicker.value = now.toISOString().slice(0, 10);
     updateHeaderDate();
-    loadCodes(selectedDays);
+    loadCodes(30);
     loadMonth(currentMonth);
     loadDate(datePicker.value);
     loadYear(now.getFullYear());

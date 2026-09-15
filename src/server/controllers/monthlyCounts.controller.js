@@ -1,4 +1,4 @@
-const { buildDateRangeMatch } = require('../repositories/mongoQuery');
+const { buildDatetimeRangeMatch } = require('../repositories/mongoQuery');
 
 function createMonthlyCountsController({ config, fetchRecordsFromFile, getMongoCollection, getCachedResponse, cacheResponse }) {
   async function getMonthlyCounts(req, res) {
@@ -24,10 +24,8 @@ function createMonthlyCountsController({ config, fetchRecordsFromFile, getMongoC
       const yearStart = `${year}-01-01`;
       const yearEnd = `${year}-12-31`;
       const pipeline = [
-        { $match: buildDateRangeMatch(yearStart, yearEnd) },
-        { $addFields: { dateNormalized: { $cond: [{ $ifNull: ['$datetime', false] }, { $dateToString: { format: '%Y-%m-%d', date: '$datetime' } }, { $substrCP: ['$date', 0, 10] }] } } },
-        { $project: { dateNormalized: 1, codes: { $cond: [{ $isArray: '$codes' }, '$codes', { $cond: [{ $ifNull: ['$code', false] }, ['$code'], []] }] } } },
-        { $match: { dateNormalized: { $regex: `^${year}-` } } },
+        { $match: buildDatetimeRangeMatch(yearStart, yearEnd) },
+        { $addFields: { dateNormalized: { $dateToString: { format: '%Y-%m-%d', date: '$datetime' } }, codes: { $cond: [{ $isArray: '$codes' }, '$codes', ['$code']] } } },
         { $unwind: '$codes' },
         { $group: { _id: { month: { $substrCP: ['$dateNormalized', 0, 7] }, date: '$dateNormalized', code: '$codes' } } },
         { $group: { _id: '$_id.month', count: { $sum: 1 } } },

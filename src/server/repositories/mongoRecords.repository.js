@@ -4,11 +4,30 @@ const RECORD_INDEXES = [
   { key: { date: 1 }, name: 'idx_records_date' },
   { key: { codes: 1, date: 1 }, name: 'idx_records_codes_date' },
   { key: { datetime: 1 }, name: 'idx_records_datetime' },
-  { key: { codes: 1, datetime: 1 }, name: 'idx_records_codes_datetime' }
+  { key: { codes: 1, datetime: 1 }, name: 'idx_records_codes_datetime' },
+  {
+    key: { code: 1, date: 1 },
+    name: 'idx_records_code_date',
+    partialFilterExpression: { code: { $exists: true } }
+  },
+  {
+    key: { code: 1, datetime: 1 },
+    name: 'idx_records_code_datetime',
+    partialFilterExpression: { code: { $exists: true } }
+  },
+  {
+    key: { datetime: 1, code: 1, profit_percent: 1 },
+    name: 'idx_records_datetime_code_profit',
+    partialFilterExpression: { code: { $exists: true }, datetime: { $exists: true } }
+  }
 ];
 
 function sameIndexKey(left, right) {
   return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function samePartialFilter(left, right) {
+  return JSON.stringify(left || null) === JSON.stringify(right || null);
 }
 
 function createMongoRecordsRepository(config) {
@@ -41,7 +60,9 @@ function createMongoRecordsRepository(config) {
     const indexesByName = new Map(indexes.map(index => [index.name, index]));
     const invalidIndexes = RECORD_INDEXES.filter(expected => {
       const actual = indexesByName.get(expected.name);
-      return !actual || !sameIndexKey(actual.key, expected.key);
+      return !actual
+        || !sameIndexKey(actual.key, expected.key)
+        || !samePartialFilter(actual.partialFilterExpression, expected.partialFilterExpression);
     });
 
     if (invalidIndexes.length) {

@@ -49,10 +49,10 @@ test('data controller returns top codes in file mode', async () => {
 test('code history controller filters by code', async () => {
   const controller = createCodeHistoryController(dependencies());
   const res = response();
-  await controller.getCodeHistory({ query: { code: 'acb' } }, res);
+  await controller.getCodeHistory({ query: { code: 'acb', days: '30' } }, res);
   assert.equal(res.body.source, 'file');
   assert.equal(res.body.code, 'ACB');
-  assert.deepEqual(res.body.days.map(day => day.date), ['2026-08-29', '2026-08-30']);
+  assert.deepEqual(res.body.days.map(day => day.date), ['2026-08-30', '2026-08-29']);
 });
 
 test('monthly counts controller groups unique code days', async () => {
